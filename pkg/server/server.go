@@ -46,14 +46,13 @@ import (
 	netdefinformerv1 "github.com/k8snetworkplumbingwg/network-attachment-definition-client/pkg/client/informers/externalversions/k8s.cni.cncf.io/v1"
 
 	kapi "k8s.io/api/core/v1"
-	meta "k8s.io/apimachinery/pkg/api/meta"
+	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/fields"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/util/sets"
 	utilwait "k8s.io/apimachinery/pkg/util/wait"
 	informerfactory "k8s.io/client-go/informers"
-	v1coreinformers "k8s.io/client-go/informers/core/v1"
 	"k8s.io/client-go/informers/internalinterfaces"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/tools/cache"
@@ -159,7 +158,7 @@ func informerObjectTrim(obj interface{}) (interface{}, error) {
 }
 
 func newNetDefInformer(netdefClient netdefclient.Interface) (netdefinformer.SharedInformerFactory, cache.SharedIndexInformer) {
-	const resyncInterval time.Duration = 1 * time.Second
+	const resyncInterval time.Duration = 0 * time.Second
 
 	informerFactory := netdefinformer.NewSharedInformerFactoryWithOptions(netdefClient, resyncInterval)
 	netdefInformer := informerFactory.InformerFor(&netdefv1.NetworkAttachmentDefinition{}, func(client netdefclient.Interface, resyncPeriod time.Duration) cache.SharedIndexInformer {
@@ -183,18 +182,12 @@ func newPodInformer(kubeClient kubernetes.Interface, nodeName string) (internali
 		}
 	}
 
-	const resyncInterval time.Duration = 1 * time.Second
+	const resyncInterval time.Duration = 0 * time.Second
 
-	informerFactory := informerfactory.NewSharedInformerFactoryWithOptions(kubeClient, resyncInterval, informerfactory.WithTransform(informerObjectTrim))
-	podInformer := informerFactory.InformerFor(&kapi.Pod{}, func(c kubernetes.Interface, resyncPeriod time.Duration) cache.SharedIndexInformer {
-		return v1coreinformers.NewFilteredPodInformer(
-			c,
-			kapi.NamespaceAll,
-			resyncPeriod,
-			cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc},
-			tweakFunc)
-	})
-
+	informerFactory := informerfactory.NewSharedInformerFactoryWithOptions(
+		kubeClient, resyncInterval, informerfactory.WithTweakListOptions(tweakFunc))
+	k8sPodFilteredInformer := informerFactory.Core().V1().Pods()
+	podInformer := k8sPodFilteredInformer.Informer()
 	return informerFactory, podInformer
 }
 
@@ -255,7 +248,7 @@ func NewCNIServer(daemonConfig *ControllerNetConf, serverConfig []byte, ignoreRe
 }
 
 func newCNIServer(rundir string, kubeClient *k8s.ClientInfo, exec invoke.Exec, servConfig []byte, ignoreReadinessIndicator bool) (*Server, error) {
-	informerFactory, podInformer := newPodInformer(kubeClient.Client, os.Getenv("MULTUS_NODE_NAME"))
+	podInformerFactory, podInformer := newPodInformer(kubeClient.Client, os.Getenv("MULTUS_NODE_NAME"))
 	netdefInformerFactory, netdefInformer := newNetDefInformer(kubeClient.NetClient)
 	kubeClient.SetK8sClientInformers(podInformer, netdefInformer)
 
@@ -277,7 +270,7 @@ func newCNIServer(rundir string, kubeClient *k8s.ClientInfo, exec invoke.Exec, s
 				[]string{"handler", "code", "method"},
 			),
 		},
-		informerFactory:          informerFactory,
+		podInformerFactory:       podInformerFactory,
 		podInformer:              podInformer,
 		netdefInformerFactory:    netdefInformerFactory,
 		netdefInformer:           netdefInformer,
@@ -356,7 +349,7 @@ func newCNIServer(rundir string, kubeClient *k8s.ClientInfo, exec invoke.Exec, s
 
 // Start starts the server and begins serving on the given listener
 func (s *Server) Start(ctx context.Context, l net.Listener) {
-	s.informerFactory.Start(ctx.Done())
+	s.podInformerFactory.Start(ctx.Done())
 	s.netdefInformerFactory.Start(ctx.Done())
 
 	// Give the initial sync some time to complete in large clusters, but
