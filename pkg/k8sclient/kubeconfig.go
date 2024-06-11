@@ -74,7 +74,7 @@ func getPerNodeKubeconfig(bootstrap *rest.Config, certDir string) *rest.Config {
 		QPS:   50,
 		Burst: 50,
 		// Set the config timeout to one minute.
-		Timeout: time.Minute,
+		Timeout: 5 * time.Minute,
 	}
 }
 
@@ -213,7 +213,7 @@ func GetK8sClient(kubeconfig string, kubeClient *ClientInfo) (*ClientInfo, error
 	config.AcceptContentTypes = "application/vnd.kubernetes.protobuf,application/json"
 	config.ContentType = "application/vnd.kubernetes.protobuf"
 	// Set the config timeout to one minute.
-	config.Timeout = time.Minute
+	config.Timeout = 5 * time.Minute
 	// Allow multus (especially in server mode) to make more concurrent requests
 	// to reduce client-side throttling
 	config.QPS = 50
