@@ -42,6 +42,16 @@ import (
 )
 
 func main() {
+	//klog.InitFlags(nil)
+	//defaultLevel := "6"
+	//val := os.Getenv("KLOG_LEVEL")
+	//if val != "" {
+	//	flag.Set("v", val)
+	//} else {
+	//	flag.Set("v", defaultLevel)
+	//}
+	//flag.Parse()
+
 	flag.CommandLine = flag.NewFlagSet(os.Args[0], flag.ExitOnError)
 
 	// keep in command line option

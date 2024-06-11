@@ -41,6 +41,7 @@ import (
 	"k8s.io/klog"
 
 	netclient "github.com/k8snetworkplumbingwg/network-attachment-definition-client/pkg/client/clientset/versioned"
+
 	"gopkg.in/k8snetworkplumbingwg/multus-cni.v4/pkg/logging"
 )
 
@@ -235,7 +236,9 @@ func newClientInfo(config *rest.Config) (*ClientInfo, error) {
 	}
 
 	broadcaster := record.NewBroadcaster()
-	broadcaster.StartLogging(klog.Infof)
+	var logLevel klog.Level
+	logLevel.Set(os.Getenv("KLOG_LEVEL"))
+	broadcaster.StartLogging(klog.V(logLevel).Infof)
 	broadcaster.StartRecordingToSink(&v1core.EventSinkImpl{Interface: client.CoreV1().Events("")})
 	recorder := broadcaster.NewRecorder(scheme.Scheme, v1.EventSource{Component: "multus"})
 	return &ClientInfo{
