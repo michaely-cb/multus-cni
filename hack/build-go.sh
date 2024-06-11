@@ -20,6 +20,8 @@ elif [ "$TARGETPLATFORM" = "linux/s390x" ]; then
 	export GOARCH=s390x
 fi
 
+go mod tidy
+
 # version information
 hasGit=true
 git version > /dev/null 2>&1 || hasGit=false
