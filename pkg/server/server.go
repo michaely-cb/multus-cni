@@ -29,6 +29,7 @@ import (
 	"github.com/containernetworking/cni/pkg/skel"
 	cnitypes "github.com/containernetworking/cni/pkg/types"
 	cni100 "github.com/containernetworking/cni/pkg/types/100"
+	v1coreinformers "k8s.io/client-go/informers/core/v1"
 
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
@@ -158,7 +159,7 @@ func informerObjectTrim(obj interface{}) (interface{}, error) {
 }
 
 func newNetDefInformer(netWatchClient netdefclient.Interface) (netdefinformer.SharedInformerFactory, cache.SharedIndexInformer) {
-	const resyncInterval time.Duration = 0 * time.Second
+	const resyncInterval time.Duration = 1 * time.Second
 
 	informerFactory := netdefinformer.NewSharedInformerFactoryWithOptions(netWatchClient, resyncInterval)
 	netdefInformer := informerFactory.InformerFor(&netdefv1.NetworkAttachmentDefinition{}, func(client netdefclient.Interface, resyncPeriod time.Duration) cache.SharedIndexInformer {
@@ -182,12 +183,17 @@ func newPodInformer(watchClient kubernetes.Interface, nodeName string) (internal
 		}
 	}
 
-	const resyncInterval time.Duration = 0 * time.Second
+	const resyncInterval time.Duration = 1 * time.Second
 
-	informerFactory := informerfactory.NewSharedInformerFactoryWithOptions(
-		watchClient, resyncInterval, informerfactory.WithTweakListOptions(tweakFunc))
-	k8sPodFilteredInformer := informerFactory.Core().V1().Pods()
-	podInformer := k8sPodFilteredInformer.Informer()
+	informerFactory := informerfactory.NewSharedInformerFactoryWithOptions(watchClient, resyncInterval, informerfactory.WithTransform(informerObjectTrim))
+	podInformer := informerFactory.InformerFor(&kapi.Pod{}, func(c kubernetes.Interface, resyncPeriod time.Duration) cache.SharedIndexInformer {
+		return v1coreinformers.NewFilteredPodInformer(
+			c,
+			kapi.NamespaceAll,
+			resyncPeriod,
+			cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc},
+			tweakFunc)
+	})
 	return informerFactory, podInformer
 }
 
