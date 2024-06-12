@@ -40,6 +40,7 @@ import (
 	netclient "github.com/k8snetworkplumbingwg/network-attachment-definition-client/pkg/client/clientset/versioned"
 	netlister "github.com/k8snetworkplumbingwg/network-attachment-definition-client/pkg/client/listers/k8s.cni.cncf.io/v1"
 	netutils "github.com/k8snetworkplumbingwg/network-attachment-definition-client/pkg/utils"
+
 	"gopkg.in/k8snetworkplumbingwg/multus-cni.v4/pkg/kubeletclient"
 	"gopkg.in/k8snetworkplumbingwg/multus-cni.v4/pkg/logging"
 	"gopkg.in/k8snetworkplumbingwg/multus-cni.v4/pkg/types"
@@ -59,7 +60,9 @@ type NoK8sNetworkError struct {
 // ClientInfo contains information given from k8s client
 type ClientInfo struct {
 	Client           kubernetes.Interface
+	WatchClient      kubernetes.Interface
 	NetClient        netclient.Interface
+	NetWatchClient   netclient.Interface
 	EventBroadcaster record.EventBroadcaster
 	EventRecorder    record.EventRecorder
 

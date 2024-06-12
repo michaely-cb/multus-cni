@@ -157,10 +157,10 @@ func informerObjectTrim(obj interface{}) (interface{}, error) {
 	return obj, nil
 }
 
-func newNetDefInformer(netdefClient netdefclient.Interface) (netdefinformer.SharedInformerFactory, cache.SharedIndexInformer) {
+func newNetDefInformer(netWatchClient netdefclient.Interface) (netdefinformer.SharedInformerFactory, cache.SharedIndexInformer) {
 	const resyncInterval time.Duration = 0 * time.Second
 
-	informerFactory := netdefinformer.NewSharedInformerFactoryWithOptions(netdefClient, resyncInterval)
+	informerFactory := netdefinformer.NewSharedInformerFactoryWithOptions(netWatchClient, resyncInterval)
 	netdefInformer := informerFactory.InformerFor(&netdefv1.NetworkAttachmentDefinition{}, func(client netdefclient.Interface, resyncPeriod time.Duration) cache.SharedIndexInformer {
 		return netdefinformerv1.NewNetworkAttachmentDefinitionInformer(
 			client,
@@ -172,7 +172,7 @@ func newNetDefInformer(netdefClient netdefclient.Interface) (netdefinformer.Shar
 	return informerFactory, netdefInformer
 }
 
-func newPodInformer(kubeClient kubernetes.Interface, nodeName string) (internalinterfaces.SharedInformerFactory, cache.SharedIndexInformer) {
+func newPodInformer(watchClient kubernetes.Interface, nodeName string) (internalinterfaces.SharedInformerFactory, cache.SharedIndexInformer) {
 	var tweakFunc internalinterfaces.TweakListOptionsFunc
 	if nodeName != "" {
 		logging.Verbosef("Filtering pod watch for node %q", nodeName)
@@ -185,7 +185,7 @@ func newPodInformer(kubeClient kubernetes.Interface, nodeName string) (internali
 	const resyncInterval time.Duration = 0 * time.Second
 
 	informerFactory := informerfactory.NewSharedInformerFactoryWithOptions(
-		kubeClient, resyncInterval, informerfactory.WithTweakListOptions(tweakFunc))
+		watchClient, resyncInterval, informerfactory.WithTweakListOptions(tweakFunc))
 	k8sPodFilteredInformer := informerFactory.Core().V1().Pods()
 	podInformer := k8sPodFilteredInformer.Informer()
 	return informerFactory, podInformer
@@ -248,8 +248,8 @@ func NewCNIServer(daemonConfig *ControllerNetConf, serverConfig []byte, ignoreRe
 }
 
 func newCNIServer(rundir string, kubeClient *k8s.ClientInfo, exec invoke.Exec, servConfig []byte, ignoreReadinessIndicator bool) (*Server, error) {
-	podInformerFactory, podInformer := newPodInformer(kubeClient.Client, os.Getenv("MULTUS_NODE_NAME"))
-	netdefInformerFactory, netdefInformer := newNetDefInformer(kubeClient.NetClient)
+	podInformerFactory, podInformer := newPodInformer(kubeClient.WatchClient, os.Getenv("MULTUS_NODE_NAME"))
+	netdefInformerFactory, netdefInformer := newNetDefInformer(kubeClient.NetWatchClient)
 	kubeClient.SetK8sClientInformers(podInformer, netdefInformer)
 
 	router := http.NewServeMux()
