@@ -22,6 +22,7 @@ import (
 	"fmt"
 	"os"
 	"path"
+	"strconv"
 	"strings"
 	"time"
 
@@ -41,6 +42,7 @@ import (
 	"k8s.io/klog"
 
 	netclient "github.com/k8snetworkplumbingwg/network-attachment-definition-client/pkg/client/clientset/versioned"
+
 	"gopkg.in/k8snetworkplumbingwg/multus-cni.v4/pkg/logging"
 )
 
@@ -48,6 +50,9 @@ const (
 	certNamePrefix       = "multus-client"
 	certCommonNamePrefix = "system:multus"
 	certOrganization     = "system:multus"
+
+	defaultQps   = 50
+	defaultBurst = 50
 )
 
 var (
@@ -70,8 +75,8 @@ func getPerNodeKubeconfig(bootstrap *rest.Config, certDir string) *rest.Config {
 		},
 		// Allow multus (especially in server mode) to make more concurrent requests
 		// to reduce client-side throttling
-		QPS:   50,
-		Burst: 50,
+		QPS:   getKubeClientQPS(),
+		Burst: getKubeClientBurst(),
 		// Set the config timeout to one minute.
 		Timeout: time.Minute,
 	}
@@ -215,8 +220,8 @@ func GetK8sClient(kubeconfig string, kubeClient *ClientInfo) (*ClientInfo, error
 	config.Timeout = time.Minute
 	// Allow multus (especially in server mode) to make more concurrent requests
 	// to reduce client-side throttling
-	config.QPS = 50
-	config.Burst = 50
+	config.QPS = getKubeClientQPS()
+	config.Burst = getKubeClientBurst()
 
 	return newClientInfo(config)
 }
@@ -257,4 +262,20 @@ func newClientInfo(config *rest.Config) (*ClientInfo, error) {
 		EventBroadcaster: broadcaster,
 		EventRecorder:    recorder,
 	}, nil
+}
+
+func getKubeClientQPS() float32 {
+	val, err := strconv.Atoi(os.Getenv("KUBE_CLIENT_QPS"))
+	if err != nil || val == 0 {
+		return defaultQps
+	}
+	return float32(val)
+}
+
+func getKubeClientBurst() int {
+	val, err := strconv.Atoi(os.Getenv("KUBE_CLIENT_BURST"))
+	if err != nil || val == 0 {
+		return defaultBurst
+	}
+	return val
 }
